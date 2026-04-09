@@ -38,33 +38,36 @@ class _AppShellState extends State<AppShell> {
   }
 
   late final List<_ShellDestination> _baseDestinations = [
-    const _ShellDestination(
+    _ShellDestination(
       label: 'Inicio',
       icon: Icons.home_rounded,
-      page: HomePage(),
+      pageBuilder: () => const HomePage(),
     ),
-    const _ShellDestination(
+    _ShellDestination(
       label: 'Ejercicios',
       icon: Icons.fitness_center,
-      page: ExercisesPage(),
+      pageBuilder: () => const ExercisesPage(),
     ),
-    const _ShellDestination(
+    _ShellDestination(
       label: 'Chat',
       icon: Icons.chat_bubble_outline_rounded,
-      page: ChatPage(),
+      pageBuilder: () => const ChatPage(),
     ),
-    const _ShellDestination(
+    _ShellDestination(
       label: 'Perfil',
       icon: Icons.person_outline_rounded,
-      page: ProfilePage(),
+      pageBuilder: () => const ProfilePage(),
     ),
   ];
 
-  late final _ShellDestination _adminDestination = const _ShellDestination(
+  late final _ShellDestination _adminDestination = _ShellDestination(
     label: 'Admin',
     icon: Icons.settings_outlined,
-    page: AdminPage(),
+    pageBuilder: () => const AdminPage(),
   );
+
+  // Cache de páginas instanciadas para mantener su estado y crear perezosamente
+  final Map<int, Widget> _pageCache = {};
 
   List<_ShellDestination> _destinationsForRole(AppUserRole role) {
     if (role == AppUserRole.admin || role == AppUserRole.trainer) {
@@ -85,6 +88,12 @@ class _AppShellState extends State<AppShell> {
 
         final bottomInset = MediaQuery.of(context).viewInsets.bottom;
         final keyboardOpen = bottomInset > 0;
+
+        // Asegurar que la página actual esté en cache para crearla perezosamente
+        if (!_pageCache.containsKey(_currentIndex) || _pageCache.length > destinations.length) {
+          _pageCache.removeWhere((k, v) => k >= destinations.length);
+          _pageCache[_currentIndex] = destinations[_currentIndex].pageBuilder();
+        }
 
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: const SystemUiOverlayStyle(
@@ -127,18 +136,18 @@ class _AppShellState extends State<AppShell> {
                               : (navVisible
                                 ? _contentBottomInset(context)
                                 : MediaQuery.viewPaddingOf(context).bottom);
+                          // Construir un listado con widgets cacheados; páginas no creadas
+                          // se representan como SizedBox.shrink() para evitar instanciarlas
+                          final children = List<Widget>.generate(destinations.length, (i) {
+                            final w = _pageCache[i] ?? const SizedBox.shrink();
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: bottomPad),
+                              child: w,
+                            );
+                          });
                           return IndexedStack(
                             index: _currentIndex,
-                            children: destinations
-                                .map(
-                                  (item) => Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: bottomPad,
-                                    ),
-                                    child: item.page,
-                                  ),
-                                )
-                                .toList(),
+                            children: children,
                           );
                         },
                       ),
@@ -157,7 +166,12 @@ class _AppShellState extends State<AppShell> {
                                   destinations: destinations,
                                   currentIndex: _currentIndex,
                                   unread: unread,
-                                  onTap: (index) => setState(() => _currentIndex = index),
+                                  onTap: (index) {
+                                    if (!_pageCache.containsKey(index)) {
+                                      _pageCache[index] = destinations[index].pageBuilder();
+                                    }
+                                    setState(() => _currentIndex = index);
+                                  },
                                 ),
                               ),
                             );
@@ -287,13 +301,13 @@ class _FloatingNavBar extends StatelessWidget {
 }
 
 class _ShellDestination {
-  const _ShellDestination({
+  _ShellDestination({
     required this.label,
     required this.icon,
-    required this.page,
+    required this.pageBuilder,
   });
 
   final String label;
   final IconData icon;
-  final Widget page;
+  final Widget Function() pageBuilder;
 }
