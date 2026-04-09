@@ -1114,6 +1114,26 @@ class _ExerciseWeightDetailSheetState
                               size: 20,
                             ),
                           ),
+                          confirmDismiss: (_) async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Eliminar registro'),
+                                content: Text('¿Eliminar el registro de ${formatted} kg del ${_formatDate(item.date)}?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancelar'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                                  ),
+                                ],
+                              ),
+                            );
+                            return confirmed ?? false;
+                          },
                           onDismissed: (_) {
                             UserStore.instance
                                 .removeCurrentUserExerciseWeightEntry(
@@ -1168,6 +1188,37 @@ class _ExerciseWeightDetailSheetState
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  onPressed: () async {
+                                    final ok = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Eliminar registro'),
+                                        content: Text('¿Eliminar el registro de ${formatted} kg del ${_formatDate(item.date)}?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, false),
+                                            child: const Text('Cancelar'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, true),
+                                            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (ok ?? false) {
+                                      UserStore.instance.removeCurrentUserExerciseWeightEntry(
+                                        item.exerciseName,
+                                        item.date,
+                                      );
+                                      setState(() {});
+                                    }
+                                  },
+                                  icon: const Icon(Icons.close_rounded, size: 18),
+                                  tooltip: 'Eliminar registro',
                                 ),
                               ],
                             ),
