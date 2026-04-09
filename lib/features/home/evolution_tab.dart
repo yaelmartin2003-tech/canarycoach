@@ -90,6 +90,9 @@ class _EvolutionTabState extends State<EvolutionTab> {
     final descCtrl = TextEditingController();
     Uint8List? selectedImage;
     var selectedImageName = '';
+    var selectedImageUrl = '';
+    var isUploadingPhoto = false;
+    var isSaving = false;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -141,16 +144,40 @@ class _EvolutionTabState extends State<EvolutionTab> {
                       ),
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
-                        onPressed: () async {
-                          await _pickImage(
-                            onPicked: (bytes, name) {
-                              setSheetState(() {
-                                selectedImage = bytes;
-                                selectedImageName = name;
-                              });
-                            },
-                          );
-                        },
+                        onPressed: isUploadingPhoto
+                            ? null
+                            : () async {
+                                await _pickImage(
+                                  onPicked: (bytes, name) async {
+                                    setSheetState(() {
+                                      selectedImage = bytes;
+                                      selectedImageName = name;
+                                      selectedImageUrl = '';
+                                      isUploadingPhoto = true;
+                                    });
+                                    final url = await CloudinaryService.uploadImageBytes(
+                                      bytes,
+                                      fileName:
+                                          'evolution_${DateTime.now().millisecondsSinceEpoch}.jpg',
+                                    );
+                                    setSheetState(() {
+                                      selectedImageUrl = url ?? '';
+                                      isUploadingPhoto = false;
+                                    });
+                                    if ((url == null || url.isEmpty) && sheetContext.mounted) {
+                                      ScaffoldMessenger.of(
+                                        sheetContext,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Error subiendo la foto. Se guardará sin imagen.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                );
+                              },
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
                             color: Theme.of(context).colorScheme.primary,
@@ -160,7 +187,16 @@ class _EvolutionTabState extends State<EvolutionTab> {
                           ).colorScheme.primary,
                         ),
                         icon: const Icon(Icons.image_rounded),
-                        label: const Text('Subir imagen'),
+                        label: isUploadingPhoto
+                            ? const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                                  SizedBox(width: 8),
+                                  Text('Subiendo foto…'),
+                                ],
+                              )
+                            : const Text('Subir imagen'),
                       ),
                       if (selectedImage != null) ...[
                         const SizedBox(height: 8),
@@ -176,42 +212,76 @@ class _EvolutionTabState extends State<EvolutionTab> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.memory(
-                            selectedImage!,
-                            height: 130,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
+                        Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.memory(
+                                selectedImage!,
+                                height: 130,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            if (isUploadingPhoto)
+                              const Positioned(
+                                bottom: 6,
+                                right: 8,
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                ),
+                              ),
+                            if (selectedImageUrl.isNotEmpty)
+                              Positioned(
+                                bottom: 6,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.cloud_done, color: Colors.greenAccent, size: 14),
+                                      SizedBox(width: 4),
+                                      Text('Subida', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ],
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () async {
-                            final title = titleCtrl.text.trim();
-                            final desc = descCtrl.text.trim();
-                            if (title.isEmpty) return;
-                            String imageUrl = '';
-                            if (selectedImage != null) {
-                              // TODO: Reemplazar por Cloudinary o Firebase Storage
-                              // Implementa la subida real aquí
-                              imageUrl = '';
-                            }
-                            UserStore.instance.addEvolutionTestForUser(
-                              userIndex,
-                              title: title,
-                              description: desc,
-                              createdByAdmin: widget.adminMode,
-                              imageBytes: selectedImage,
-                              imageUrl: imageUrl,
-                              imageName: selectedImageName,
-                            );
-                            if (!sheetContext.mounted) return;
-                            Navigator.pop(sheetContext);
-                          },
+                          onPressed: (isSaving || isUploadingPhoto || (selectedImage != null && selectedImageUrl.isEmpty))
+                              ? null
+                              : () async {
+                                  setSheetState(() => isSaving = true);
+                                  final title = titleCtrl.text.trim();
+                                  final desc = descCtrl.text.trim();
+                                  if (title.isEmpty) {
+                                    setSheetState(() => isSaving = false);
+                                    return;
+                                  }
+                                  UserStore.instance.addEvolutionTestForUser(
+                                    userIndex,
+                                    title: title,
+                                    description: desc,
+                                    createdByAdmin: widget.adminMode,
+                                    imageBytes: selectedImage,
+                                    imageUrl: selectedImageUrl,
+                                    imageName: selectedImageName,
+                                  );
+                                  if (!sheetContext.mounted) return;
+                                  Navigator.pop(sheetContext);
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(
                               context,
