@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+  <meta name="google-signin-client_id" content="1018470167099-j9jnmsureoqshdc5mp7n4jotq6qsrhdi.apps.googleusercontent.com">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="CanaryCoach">
+  <link rel="apple-touch-icon" href="assets/logo.png?v=2">
+
+  <!-- Favicon preferido: PNG versionado (evita caché antiguo) - usar la pesa sin fondo -->
+  <link rel="icon" type="image/png" href="assets/logo%20sin%20fondo%20CanaryCoach.png?v=2" />
+  <link rel="apple-touch-icon" href="assets/logo%20sin%20fondo%20CanaryCoach.png?v=2" />
+  <!-- Fallback ICO (con versión para forzar recarga) -->
+  <link rel="icon" type="image/x-icon" href="logoapp48.png.ico?v=2" />
+  <link rel="shortcut icon" href="logoapp48.png.ico?v=2" />
+
+  <!-- Script: generar favicon redondeado a partir del logo (evita editar binarios) -->
+  <script>
+    (function(){
+      const preferred = 'assets/logo%20sin%20fondo%20CanaryCoach.png?v=2';
+      function setRoundedFavicon(src){
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function(){
+          const size = 64;
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const r = Math.round(size * 0.18);
+          ctx.clearRect(0,0,size,size);
+          ctx.beginPath();
+          ctx.moveTo(r,0);
+          ctx.arcTo(size,0,size,size,r);
+          ctx.arcTo(size,size,0,size,r);
+          ctx.arcTo(0,size,0,0,r);
+          ctx.arcTo(0,0,size,0,r);
+          ctx.closePath();
+          ctx.clip();
+          // scale cover
+          const scale = Math.max(size / img.width, size / img.height);
+          const w = img.width * scale;
+          const h = img.height * scale;
+          const x = (size - w) / 2;
+          const y = (size - h) / 2;
+          ctx.drawImage(img, x, y, w, h);
+          const dataURL = canvas.toDataURL('image/png');
+          function updateRel(rel){
+            let link = document.querySelector("link[rel='"+rel+"']");
+            if(!link){
+              link = document.createElement('link');
+              link.rel = rel;
+              document.head.appendChild(link);
+            }
+            link.href = dataURL;
+          }
+          updateRel('icon');
+          updateRel('shortcut icon');
+          updateRel('apple-touch-icon');
+        };
+        img.onerror = function(){ /* fallback: dejar ico actual */ };
+        img.src = src;
+      }
+      // Intentar con el asset transparente; si falla, no sustituir
+      setRoundedFavicon(preferred);
+    })();
+  </script>
+
+  <title>CanaryCoach</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    html, body {
+      background-color: #0D0D0D;
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      /* No pre-cargar ni mostrar la imagen de bienvenida aquí para evitar
+         que la pantalla de bienvenida aparezca en recargas o hot-restarts.
+         La pantalla de bienvenida se mostrará solo dentro de Flutter
+         cuando proceda (primera vez en release). */
+    }
+  </style>
+</head>
+<body>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

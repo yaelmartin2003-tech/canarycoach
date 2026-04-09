@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter Chrome (fix viewInsets)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "chrome",
+      "args": [
+        "--web-browser-flag=--disable-blink-features=VirtualKeyboard"
+      ]
+    }
+  ]
+}

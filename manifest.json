@@ -1,0 +1,16 @@
+{
+  "name": "GYMCOACH",
+  "short_name": "GymCoach",
+  "description": "Tu entrenador personal inteligente",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D0D0D",
+  "theme_color": "#0D0D0D",
+  "icons": [
+    {
+      "src": "assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

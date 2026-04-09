@@ -1,0 +1,37 @@
+{
+	"firestore": {
+		"rules": "firestore.rules"
+	},
+	"flutter": {
+		"platforms": {
+			"android": {
+				"default": {
+					"projectId": "canarycoach-80e16",
+					"appId": "1:1018470167099:android:eee349770d297c28c6e21e",
+					"fileOutput": "android/app/google-services.json"
+				}
+			},
+			"dart": {
+				"lib/firebase_options.dart": {
+					"projectId": "canarycoach-80e16",
+					"configurations": {
+						"android": "1:1018470167099:android:eee349770d297c28c6e21e",
+						"ios": "1:1018470167099:ios:279ee08eb2303e60c6e21e",
+						"web": "1:1018470167099:web:aafe9cb0cba1331ec6e21e"
+					}
+				}
+			}
+		}
+	},
+	"hosting": {
+		"public": "build/web",
+		"ignore": [
+			"firebase.json",
+			"**/.*",
+			"**/node_modules/**"
+		],
+		"rewrites": [
+			{ "source": "**", "destination": "/index.html" }
+		]
+	}
+}

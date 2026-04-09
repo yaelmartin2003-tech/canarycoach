@@ -1,0 +1,106 @@
+{
+  "project_info": {
+    "project_number": "1018470167099",
+    "project_id": "canarycoach-80e16",
+    "storage_bucket": "canarycoach-80e16.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1018470167099:android:4775ace25ceb69ccc6e21e",
+        "android_client_info": {
+          "package_name": "com.canarycoach.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1018470167099-ra4hdfa9k19c1l8scp2j76tli5628iqp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.canarycoach.app",
+            "certificate_hash": "b0fa9b6ec3276b690df4a9a254370a0693815cb8"
+          }
+        },
+        {
+          "client_id": "1018470167099-j9jnmsureoqshdc5mp7n4jotq6qsrhdi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhtUByDSmdJ9Xde-_et-_uitSQmsWDWbU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1018470167099-j9jnmsureoqshdc5mp7n4jotq6qsrhdi.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1018470167099-24lmidjr5min0cnsg30m514qpkffhc28.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.gymcoach"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1018470167099:android:eee349770d297c28c6e21e",
+        "android_client_info": {
+          "package_name": "com.example.gymcoach"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1018470167099-q78hf072hnm7ul2c1pke7tu40ma6h6pv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.gymcoach",
+            "certificate_hash": "b0fa9b6ec3276b690df4a9a254370a0693815cb8"
+          }
+        },
+        {
+          "client_id": "1018470167099-skgrconm1d604nfjiuumbdlc6k95mno6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.gymcoach",
+            "certificate_hash": "c5efc53ac917492c0e31c7fc9d68e8489ce42e88"
+          }
+        },
+        {
+          "client_id": "1018470167099-j9jnmsureoqshdc5mp7n4jotq6qsrhdi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhtUByDSmdJ9Xde-_et-_uitSQmsWDWbU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1018470167099-j9jnmsureoqshdc5mp7n4jotq6qsrhdi.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1018470167099-24lmidjr5min0cnsg30m514qpkffhc28.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.gymcoach"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,23 @@
+{
+    "name": "CanaryCoach",
+    "short_name": "CanaryCoach",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0D0D0D",
+    "theme_color": "#0D0D0D",
+    "description": "CanaryCoach web app",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "assets/logo%20sin%20fondo%20CanaryCoach.png?v=2",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "assets/logo%20sin%20fondo%20CanaryCoach.png?v=2",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

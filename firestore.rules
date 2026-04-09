@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Evita que un usuario normal se asigne rol de admin
+    function safeRole() {
+      return !('role' in request.resource.data) ||
+             request.resource.data.role in ['user', 'trainer'];
+    }
+
+    // ── Usuarios ───────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Cualquier usuario autenticado puede leer perfiles
+      allow read: if isAuth();
+      // El dueño puede editar su propio doc (sin poder escalar a admin)
+      allow write: if isOwner(userId) && safeRole();
+      // El admin puede editar cualquier usuario sin restricción
+      allow write: if isAdmin();
+    }
+
+    // ── Claves de acceso ───────────────────────────────────────────────────────
+    match /access_keys/{keyId} {
+      // Cualquier usuario autenticado puede leer (necesario para verificar códigos)
+      allow read: if isAuth();
+      // Cualquier usuario autenticado puede escribir (crear/marcar usados)
+      // El control real se hace en el código Dart (transacción atómica)
+      allow write: if isAuth();
+    }
+
+    // ── Estado global de la app (ejercicios, rutinas, usuarios) ────────────────
+    match /app_state/{doc} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    // ── Datos ricos de cada usuario (entrenos, evolución, seguimiento) ─────────
+    match /user_rich_data/{userId} {
+      // El propio usuario puede leer y escribir sus datos
+      allow read, write: if isAuth() && request.auth.uid == userId;
+      // Admin y entrenadores pueden leer (para ver datos de sus clientes)
+      allow read: if isAdmin();
+      allow read: if isAuth() &&
+        get(/databases/$(database)/documents/users/$(userId)).data.entrenadorId == request.auth.uid;
+    }
+
+    // ── Chat ───────────────────────────────────────────────────────────────────
+    match /chats/{chatId} {
+      allow read, write: if isAuth();
+      match /messages/{msgId} {
+        allow read, write: if isAuth();
+      }
+    }
+  }
+}

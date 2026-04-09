@@ -1,0 +1,88 @@
+/* Animaciones suaves */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.vista.activa { animation: fadeIn 0.3s ease-out; }
+
+nav {
+  background: var(--blanco) !important;
+  border-top: 1px solid #e5e7eb !important;
+}
+
+nav button {
+  color: var(--texto-negro) !important;
+}
+
+nav button.activo {
+  color: var(--azul-activo) !important;
+}
+
+/* Barra inferior No Excuse Style */
+nav {
+  background: var(--blanco) !important;
+  border-top: 1px solid #e5e7eb !important;
+  padding: 0.8rem 1rem !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  display: flex !important;
+  justify-content: space-around !important;
+  align-items: center !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.1) !important;
+  z-index: 1000 !important;
+}
+
+nav button {
+  background: none !important;
+  border: none !important;
+  color: #6b7280 !important;
+  font-size: 0.75rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  padding: 0.5rem !important;
+  border-radius: 12px !important;
+  transition: all 0.3s !important;
+  position: relative !important;
+}
+
+nav button .material-symbols-outlined {
+  font-size: 24px !important;
+  margin-bottom: 4px !important;
+  color: inherit !important;
+}
+
+nav button.activo,
+nav button.activo .material-symbols-outlined {
+  color: #193193 !important;
+}
+
+nav button.activo {
+  background: rgba(25, 49, 147, 0.1) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Franja azul inferior móvil */
+nav::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #193193, #38A9FF);
+  border-radius: 2px 2px 0 0;
+  width: 60px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px rgba(25, 49, 147, 0.5);
+}
+
+nav button.activo ~ nav::after,
+nav button.activo:nth-child(1) ~ nav::after { left: 5%; }
+nav button.activo:nth-child(2) ~ nav::after { left: 25%; }
+nav button.activo:nth-child(3) ~ nav::after { left: 45%; }
+nav button.activo:nth-child(4) ~ nav::after { left: 65%; }
+nav button.activo:nth-child(5) ~ nav::after { left: 85%; }
