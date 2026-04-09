@@ -6,20 +6,19 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/material.dart';
 
-import 'package:gymcoach/features/shell/app_shell.dart';
-import 'package:gymcoach/features/home/home_page.dart';
+import 'package:gymcoach/app.dart';
 
 void main() {
   testWidgets('renderiza la shell principal', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: AppShell()));
-    await tester.pumpAndSettle();
+    await tester.pumpWidget(const GymCoachApp(showWelcome: false));
 
     expect(find.text('Inicio'), findsOneWidget);
-    expect(find.byType(HomePage), findsOneWidget);
-    expect(find.text('Ejercicios'), findsOneWidget);
+    expect(find.text('Entrenamiento'), findsNWidgets(2));
+    expect(find.text('Entrenamiento Diario'), findsOneWidget);
+    expect(find.text('Ejercicios'), findsWidgets);
     expect(find.text('Chat'), findsOneWidget);
     expect(find.text('Perfil'), findsOneWidget);
+    expect(find.text('Admin'), findsOneWidget);
   });
 }

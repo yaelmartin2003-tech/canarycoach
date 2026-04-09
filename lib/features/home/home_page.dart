@@ -967,8 +967,21 @@ class _MonthlyTrackingTab extends StatefulWidget {
 
 class _MonthlyTrackingTabState extends State<_MonthlyTrackingTab> {
   bool _prefetched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    UserStore.instance.addListener(_onUserStoreChanged);
+  }
+
+  void _onUserStoreChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    UserStore.instance.removeListener(_onUserStoreChanged);
     super.dispose();
   }
 
@@ -1169,208 +1182,7 @@ class _MonthlyTrackingTabState extends State<_MonthlyTrackingTab> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetCtx) {
-        Uint8List? photoBytes;
-        String photoUrl = '';
-        final weightCtrl = TextEditingController();
-        final waistCtrl = TextEditingController();
-        final hipsCtrl = TextEditingController();
-        final armsCtrl = TextEditingController();
-        final thighsCtrl = TextEditingController();
-        final calvesCtrl = TextEditingController();
-        final notesCtrl = TextEditingController();
-        var isSaving = false;
-
-        return StatefulBuilder(
-          builder: (sheetCtx, setSheet) {
-            final bottom = MediaQuery.of(sheetCtx).viewInsets.bottom +
-                MediaQuery.viewPaddingOf(sheetCtx).bottom;
-            return RepaintBoundary(child: Container(
-              decoration: BoxDecoration(
-                color: AppTheme.modalSurfaceFor(sheetCtx),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: AppTheme.modalShadowFor(sheetCtx),
-              ),
-              padding: EdgeInsets.fromLTRB(18, 16, 18, 18 + bottom),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Nuevo seguimiento',
-                            style: TextStyle(
-                              color: Theme.of(sheetCtx).colorScheme.onSurface,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(sheetCtx),
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    // Fecha
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(sheetCtx).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Theme.of(sheetCtx).dividerColor),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.event_rounded, size: 16, color: AppColors.secondaryText),
-                          const SizedBox(width: 8),
-                          Text(
-                            _formatDateLong(DateTime.now()),
-                            style: const TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                          const Spacer(),
-                          const Text('Automática', style: TextStyle(color: AppColors.secondaryText, fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Foto
-                    InkWell(
-                      onTap: () async {
-                        final result = await FilePicker.platform.pickFiles(
-                          type: FileType.image, allowMultiple: false, withData: true,
-                        );
-                        final bytes = result?.files.single.bytes;
-                        if (bytes == null || !mounted) return;
-                        setSheet(() => photoBytes = bytes);
-                        final url = await CloudinaryService.uploadImageBytes(
-                          bytes, fileName: 'progress_${DateTime.now().millisecondsSinceEpoch}.jpg',
-                        );
-                        if (!mounted) return;
-                        setSheet(() => photoUrl = url ?? '');
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: double.infinity,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: Theme.of(sheetCtx).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Theme.of(sheetCtx).dividerColor),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: photoBytes == null
-                            ? const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add_a_photo_rounded, color: AppColors.secondaryText, size: 28),
-                                  SizedBox(height: 6),
-                                  Text('Añadir foto (opcional)', style: TextStyle(color: AppColors.secondaryText, fontSize: 12)),
-                                ],
-                              )
-                            : Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  Image.memory(photoBytes!, fit: BoxFit.cover),
-                                  if (photoUrl.isEmpty)
-                                    const Positioned(
-                                      bottom: 6, right: 8,
-                                      child: SizedBox(width: 16, height: 16,
-                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-                                    ),
-                                  if (photoUrl.isNotEmpty)
-                                    const Positioned(
-                                      bottom: 6, right: 8,
-                                      child: Icon(Icons.cloud_done, color: Colors.greenAccent, size: 18),
-                                    ),
-                                ],
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Medidas
-                    Text('Medidas (opcional)',
-                        style: TextStyle(color: Theme.of(sheetCtx).colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 13)),
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      Expanded(child: _sheetField(sheetCtx, weightCtrl, 'Peso (kg)', '70.5')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _sheetField(sheetCtx, waistCtrl, 'Cintura (cm)', '80')),
-                    ]),
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      Expanded(child: _sheetField(sheetCtx, hipsCtrl, 'Cadera (cm)', '95')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _sheetField(sheetCtx, armsCtrl, 'Brazos (cm)', '32')),
-                    ]),
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      Expanded(child: _sheetField(sheetCtx, thighsCtrl, 'Muslos (cm)', '55')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _sheetField(sheetCtx, calvesCtrl, 'Gemelos (cm)', '35')),
-                    ]),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: notesCtrl,
-                      minLines: 2,
-                      maxLines: 4,
-                      style: TextStyle(color: Theme.of(sheetCtx).colorScheme.onSurface, fontSize: 13),
-                      decoration: _sheetInputDecoration(sheetCtx, '¿Cómo te sientes? Notas...'),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: isSaving || (photoBytes != null && photoUrl.isEmpty)
-                            ? null
-                            : () {
-                                setSheet(() => isSaving = true);
-                                final now = DateTime.now();
-                                final entry = UserTrackingEntry(
-                                  date: DateTime(now.year, now.month, now.day),
-                                  photoBytes: photoBytes,
-                                  photoUrl: photoUrl,
-                                  weightKg: _parseNum(weightCtrl.text),
-                                  waistCm: _parseNum(waistCtrl.text),
-                                  hipsCm: _parseNum(hipsCtrl.text),
-                                  armsCm: _parseNum(armsCtrl.text),
-                                  thighsCm: _parseNum(thighsCtrl.text),
-                                  calvesCm: _parseNum(calvesCtrl.text),
-                                  notes: notesCtrl.text.trim(),
-                                );
-                                UserStore.instance.addCurrentUserTrackingEntry(entry);
-                                Navigator.pop(sheetCtx);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Registro guardado correctamente.')),
-                                );
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(sheetCtx).colorScheme.primary,
-                          foregroundColor: Colors.black,
-                          minimumSize: const Size.fromHeight(48),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: isSaving
-                            ? const SizedBox(height: 18, width: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                            : photoBytes != null && photoUrl.isEmpty
-                                ? const Text('Subiendo foto...')
-                                : const Text('Guardar registro',
-                                    style: TextStyle(fontWeight: FontWeight.w800)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ));
-          },
-        );
-      },
+      builder: (sheetCtx) => _NewTrackingSheet(parentContext: context),
     );
   }
 
@@ -1399,10 +1211,269 @@ class _MonthlyTrackingTabState extends State<_MonthlyTrackingTab> {
     );
   }
 
-  static double? _parseNum(String text) {
-    final raw = text.trim();
-    if (raw.isEmpty) return null;
-    return double.tryParse(raw.replaceAll(',', '.'));
+}
+
+double? _parseNum(String text) {
+  final raw = text.trim();
+  if (raw.isEmpty) return null;
+  return double.tryParse(raw.replaceAll(',', '.'));
+}
+
+class _NewTrackingSheet extends StatefulWidget {
+  final BuildContext parentContext;
+  const _NewTrackingSheet({Key? key, required this.parentContext}) : super(key: key);
+
+  @override
+  State<_NewTrackingSheet> createState() => _NewTrackingSheetState();
+}
+
+class _NewTrackingSheetState extends State<_NewTrackingSheet> {
+  Uint8List? photoBytes;
+  String photoUrl = '';
+  late TextEditingController weightCtrl;
+  late TextEditingController waistCtrl;
+  late TextEditingController hipsCtrl;
+  late TextEditingController armsCtrl;
+  late TextEditingController thighsCtrl;
+  late TextEditingController calvesCtrl;
+  late TextEditingController notesCtrl;
+  bool isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    weightCtrl = TextEditingController();
+    waistCtrl = TextEditingController();
+    hipsCtrl = TextEditingController();
+    armsCtrl = TextEditingController();
+    thighsCtrl = TextEditingController();
+    calvesCtrl = TextEditingController();
+    notesCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    weightCtrl.dispose();
+    waistCtrl.dispose();
+    hipsCtrl.dispose();
+    armsCtrl.dispose();
+    thighsCtrl.dispose();
+    calvesCtrl.dispose();
+    notesCtrl.dispose();
+    super.dispose();
+  }
+
+  Widget _sheetField(BuildContext ctx, TextEditingController ctrl, String label, String hint) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
+      decoration: _sheetInputDecoration(ctx, hint).copyWith(
+        labelText: label,
+        labelStyle: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.7)),
+      ),
+    );
+  }
+
+  InputDecoration _sheetInputDecoration(BuildContext ctx, String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12),
+      filled: true,
+      fillColor: Theme.of(ctx).colorScheme.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Theme.of(ctx).dividerColor)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Theme.of(ctx).dividerColor)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Theme.of(ctx).colorScheme.primary)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom + MediaQuery.viewPaddingOf(context).bottom;
+    return RepaintBoundary(child: Container(
+      decoration: BoxDecoration(
+        color: AppTheme.modalSurfaceFor(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: AppTheme.modalShadowFor(context),
+      ),
+      padding: EdgeInsets.fromLTRB(18, 16, 18, 18 + bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Nuevo seguimiento',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            // Fecha
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.event_rounded, size: 16, color: AppColors.secondaryText),
+                  const SizedBox(width: 8),
+                  Text(
+                    _formatDateLong(DateTime.now()),
+                    style: const TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  const Text('Automática', style: TextStyle(color: AppColors.secondaryText, fontSize: 11)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Foto
+            InkWell(
+              onTap: () async {
+                final result = await FilePicker.platform.pickFiles(
+                  type: FileType.image, allowMultiple: false, withData: true,
+                );
+                final bytes = result?.files.single.bytes;
+                if (bytes == null || !mounted) return;
+                setState(() => photoBytes = bytes);
+                final url = await CloudinaryService.uploadImageBytes(
+                  bytes, fileName: 'progress_${DateTime.now().millisecondsSinceEpoch}.jpg',
+                );
+                if (!mounted) return;
+                setState(() => photoUrl = url ?? '');
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: photoBytes == null
+                    ? const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_a_photo_rounded, color: AppColors.secondaryText, size: 28),
+                          SizedBox(height: 6),
+                          Text('Añadir foto (opcional)', style: TextStyle(color: AppColors.secondaryText, fontSize: 12)),
+                        ],
+                      )
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.memory(photoBytes!, fit: BoxFit.cover),
+                          if (photoUrl.isEmpty)
+                            const Positioned(
+                              bottom: 6, right: 8,
+                              child: SizedBox(width: 16, height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                            ),
+                          if (photoUrl.isNotEmpty)
+                            const Positioned(
+                              bottom: 6, right: 8,
+                              child: Icon(Icons.cloud_done, color: Colors.greenAccent, size: 18),
+                            ),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Medidas
+            Text('Medidas (opcional)',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 13)),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: _sheetField(context, weightCtrl, 'Peso (kg)', '70.5')),
+              const SizedBox(width: 8),
+              Expanded(child: _sheetField(context, waistCtrl, 'Cintura (cm)', '80')),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: _sheetField(context, hipsCtrl, 'Cadera (cm)', '95')),
+              const SizedBox(width: 8),
+              Expanded(child: _sheetField(context, armsCtrl, 'Brazos (cm)', '32')),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: _sheetField(context, thighsCtrl, 'Muslos (cm)', '55')),
+              const SizedBox(width: 8),
+              Expanded(child: _sheetField(context, calvesCtrl, 'Gemelos (cm)', '35')),
+            ]),
+            const SizedBox(height: 8),
+            TextField(
+              controller: notesCtrl,
+              minLines: 2,
+              maxLines: 4,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13),
+              decoration: _sheetInputDecoration(context, '¿Cómo te sientes? Notas...'),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isSaving || (photoBytes != null && photoUrl.isEmpty)
+                    ? null
+                    : () {
+                        setState(() => isSaving = true);
+                        final now = DateTime.now();
+                        final entry = UserTrackingEntry(
+                          date: DateTime(now.year, now.month, now.day),
+                          photoBytes: photoBytes,
+                          photoUrl: photoUrl,
+                          weightKg: _parseNum(weightCtrl.text),
+                          waistCm: _parseNum(waistCtrl.text),
+                          hipsCm: _parseNum(hipsCtrl.text),
+                          armsCm: _parseNum(armsCtrl.text),
+                          thighsCm: _parseNum(thighsCtrl.text),
+                          calvesCm: _parseNum(calvesCtrl.text),
+                          notes: notesCtrl.text.trim(),
+                        );
+                        UserStore.instance.addCurrentUserTrackingEntry(entry);
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+                          const SnackBar(content: Text('Registro guardado correctamente.')),
+                        );
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: isSaving
+                    ? const SizedBox(height: 18, width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                    : photoBytes != null && photoUrl.isEmpty
+                        ? const Text('Subiendo foto...')
+                        : const Text('Guardar registro',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ));
   }
 }
 
