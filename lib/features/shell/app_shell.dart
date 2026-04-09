@@ -38,32 +38,32 @@ class _AppShellState extends State<AppShell> {
   }
 
   late final List<_ShellDestination> _baseDestinations = [
-    _ShellDestination(
+    const _ShellDestination(
       label: 'Inicio',
       icon: Icons.home_rounded,
-      pageBuilder: () => const HomePage(),
+      page: HomePage(),
     ),
-    _ShellDestination(
+    const _ShellDestination(
       label: 'Ejercicios',
       icon: Icons.fitness_center,
-      pageBuilder: () => const ExercisesPage(),
+      page: ExercisesPage(),
     ),
-    _ShellDestination(
+    const _ShellDestination(
       label: 'Chat',
       icon: Icons.chat_bubble_outline_rounded,
-      pageBuilder: () => const ChatPage(),
+      page: ChatPage(),
     ),
-    _ShellDestination(
+    const _ShellDestination(
       label: 'Perfil',
       icon: Icons.person_outline_rounded,
-      pageBuilder: () => const ProfilePage(),
+      page: ProfilePage(),
     ),
   ];
 
-  late final _ShellDestination _adminDestination = _ShellDestination(
+  late final _ShellDestination _adminDestination = const _ShellDestination(
     label: 'Admin',
     icon: Icons.settings_outlined,
-    pageBuilder: () => const AdminPage(),
+    page: AdminPage(),
   );
 
   List<_ShellDestination> _destinationsForRole(AppUserRole role) {
@@ -129,20 +129,16 @@ class _AppShellState extends State<AppShell> {
                                 : MediaQuery.viewPaddingOf(context).bottom);
                           return IndexedStack(
                             index: _currentIndex,
-                            children: List.generate(destinations.length, (i) {
-                              final item = destinations[i];
-                              return Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: bottomPad,
-                                ),
-                                // Construir sólo la página activa para evitar
-                                // instanciar widgets que usan plugins nativos
-                                // (ej. Firestore) durante tests.
-                                child: i == _currentIndex
-                                    ? item.pageBuilder()
-                                    : const SizedBox.shrink(),
-                              );
-                            }),
+                            children: destinations
+                                .map(
+                                  (item) => Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: bottomPad,
+                                    ),
+                                    child: item.page,
+                                  ),
+                                )
+                                .toList(),
                           );
                         },
                       ),
@@ -196,15 +192,15 @@ class _FloatingNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseColor = isDark
-        ? Colors.black.withValues(alpha: 0.25)
-        : Colors.white.withValues(alpha: 0.22);
+        ? Colors.black.withOpacity(0.25)
+        : Colors.white.withOpacity(0.22);
     final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.10)
-        : Colors.white.withValues(alpha: 0.45);
+        ? Colors.white.withOpacity(0.10)
+        : Colors.white.withOpacity(0.45);
     final selectedColor = isDark ? Colors.white : Colors.black;
     final unselectedColor = isDark
-        ? Colors.white.withValues(alpha: 0.45)
-        : Colors.black.withValues(alpha: 0.40);
+        ? Colors.white.withOpacity(0.45)
+        : Colors.black.withOpacity(0.40);
 
     return Container(
       height: 62,
@@ -228,26 +224,29 @@ class _FloatingNavBar extends StatelessWidget {
               final iconColor = selected ? selectedColor : unselectedColor;
               final labelColor = selected ? selectedColor : unselectedColor;
 
-              final iconWidget = i == 2 && unread > 0
-                  ? Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Icon(item.icon, color: iconColor, size: 23),
-                        Positioned(
-                          top: -2,
-                          right: -4,
-                          child: Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
+              Widget iconWidget;
+              if (i == 2 && unread > 0) {
+                iconWidget = Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(item.icon, color: iconColor, size: 23),
+                    Positioned(
+                      top: -2,
+                      right: -4,
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
                         ),
-                      ],
-                    )
-                  : Icon(item.icon, color: iconColor, size: 23);
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                iconWidget = Icon(item.icon, color: iconColor, size: 23);
+              }
 
               return Expanded(
                 child: GestureDetector(
@@ -288,13 +287,13 @@ class _FloatingNavBar extends StatelessWidget {
 }
 
 class _ShellDestination {
-  _ShellDestination({
+  const _ShellDestination({
     required this.label,
     required this.icon,
-    required this.pageBuilder,
+    required this.page,
   });
 
   final String label;
   final IconData icon;
-  final Widget Function() pageBuilder;
+  final Widget page;
 }
