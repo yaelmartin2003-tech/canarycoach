@@ -751,6 +751,7 @@ class _WeightsList extends StatelessWidget {
                       showModalBottomSheet<void>(
                         context: context,
                         isScrollControlled: true,
+                        enableDrag: false,
                         backgroundColor: Colors.transparent,
                         builder: (_) => RepaintBoundary(
                           child: _ExerciseWeightDetailSheet(
@@ -1637,6 +1638,7 @@ class _WeightsPageState extends State<_WeightsPage> {
     showModalBottomSheet<void>(
       context: pageContext,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) {
         return StatefulBuilder(

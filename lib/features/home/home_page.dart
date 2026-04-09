@@ -1181,6 +1181,7 @@ class _MonthlyTrackingTabState extends State<_MonthlyTrackingTab> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) => _NewTrackingSheet(parentContext: context),
     );

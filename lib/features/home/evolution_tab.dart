@@ -97,6 +97,7 @@ class _EvolutionTabState extends State<EvolutionTab> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
@@ -319,6 +320,7 @@ class _EvolutionTabState extends State<EvolutionTab> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
@@ -519,6 +521,7 @@ class _EvolutionTabState extends State<EvolutionTab> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return Container(
