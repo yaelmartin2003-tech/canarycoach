@@ -731,20 +731,20 @@ class _InteractiveSlideRoute<T> extends PageRoute<T> {
 
   @override
   Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
-    final _snap = backgroundSnapshot ?? lastAppSnapshot;
+    final snap = backgroundSnapshot ?? lastAppSnapshot;
     return Stack(fit: StackFit.expand, children: [
       Container(color: Colors.transparent),
-      if (_snap != null)
+      if (snap != null)
         Image.memory(
-          _snap,
+          snap,
           fit: BoxFit.cover,
           gaplessPlayback: true,
           filterQuality: FilterQuality.low,
         ),
       _LeftEdgeDragDismissible(
-        child: child,
         dragAreaFraction: 0.5,
         routeController: _internalController,
+        child: child,
       ),
     ]);
   }
@@ -812,7 +812,7 @@ class _LeftEdgeDragDismissibleState extends State<_LeftEdgeDragDismissible>
                 ),
               );
             });
-            overlay?.insert(_overlayEntry!);
+            overlay.insert(_overlayEntry!);
           }
 
           Navigator.of(context).maybePop().then((_) {
@@ -1222,7 +1222,7 @@ double? _parseNum(String text) {
 
 class _NewTrackingSheet extends StatefulWidget {
   final BuildContext parentContext;
-  const _NewTrackingSheet({Key? key, required this.parentContext}) : super(key: key);
+  const _NewTrackingSheet({required this.parentContext});
 
   @override
   State<_NewTrackingSheet> createState() => _NewTrackingSheetState();

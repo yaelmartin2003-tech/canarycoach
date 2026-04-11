@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -107,17 +108,28 @@ class _ChatPageState extends State<ChatPage> {
           .toList();
     }
 
-    // Usuario normal: no hay lista, va directo a la conversación con su trainer
+    // Usuario normal: mostrar la tarjeta del entrenador solo si el rol es
+    // `user` y además tiene `trainerId` vinculado. Para `sinclave` no
+    // mostramos tarjetas en la lista (solo el FAB de admin en la UI).
+    if (_isRegularUser) {
+      final me = UserStore.instance.currentUser;
+      final trainerId = (me.trainerId ?? '').trim();
+      if (_role == AppUserRole.user && trainerId.isNotEmpty) {
+        final trainer = all.where((u) => u.id == trainerId).firstOrNull;
+        if (trainer != null) return [_toChatUser(trainer)];
+      }
+      return [];
+    }
     return [];
   }
 
   _ChatUser _toChatUser(AppUserData u) => _ChatUser(
         id: u.id,
         name: u.name.isEmpty ? u.email : u.name,
-        initial: (u.name.isEmpty ? u.email : u.name)
-            .trim()
-            .substring(0, 1)
-            .toUpperCase(),
+        initial: (() {
+          final b = (u.name.isEmpty ? u.email : u.name).trim();
+          return b.isNotEmpty ? b.substring(0, 1).toUpperCase() : '?';
+        })(),
         messages: const [],
         photoBytes: u.photoBytes,
         photoUrl: u.photoUrl,
@@ -127,7 +139,7 @@ class _ChatPageState extends State<ChatPage> {
       );
 
   // Chat con el admin (para trainers)
-  late final _ChatUser _adminChatUser = _buildAdminChatUser();
+  _ChatUser get _adminChatUser => _buildAdminChatUser();
 
   _ChatUser _buildAdminChatUser() {
     final admin = UserStore.instance.users
@@ -147,17 +159,23 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   // Chat del usuario con su entrenador
-  late final _ChatUser _trainerChatUser = _buildTrainerChatUser();
+  _ChatUser get _trainerChatUser => _buildTrainerChatUser();
 
   _ChatUser _buildTrainerChatUser() {
     final me = UserStore.instance.currentUser;
-    if (me.trainerId != null && me.trainerId!.isNotEmpty) {
+    final trainerId = (me.trainerId ?? '').trim();
+    // Si ya tenemos un objeto persistente para este interlocutor, retornarlo
+    if (trainerId.isNotEmpty && _chatUserMap.containsKey(trainerId)) {
+      return _chatUserMap[trainerId]!;
+    }
+
+    if (trainerId.isNotEmpty) {
       final trainer = UserStore.instance.users
-          .where((u) => u.id == me.trainerId)
+          .where((u) => u.id == trainerId)
           .firstOrNull;
       final name = trainer?.name ?? 'Entrenador';
-      return _ChatUser(
-        id: me.trainerId!,
+      final u = _ChatUser(
+        id: trainerId,
         name: name,
         initial: name.isNotEmpty ? name[0].toUpperCase() : 'E',
         messages: const [],
@@ -166,11 +184,17 @@ class _ChatPageState extends State<ChatPage> {
         createdAt: trainer?.createdAt,
         role: AppUserRole.trainer,
       );
+      return u;
     }
-    // Sin trainer asignado, buscar admin como fallback
+
+    // Sin trainer asignado: fallback al admin (y preferir objeto persistente)
     final admin = UserStore.instance.users
         .where((u) => u.role == AppUserRole.admin)
         .firstOrNull;
+    final adminId = admin?.id ?? '';
+    if (adminId.isNotEmpty && _chatUserMap.containsKey(adminId)) {
+      return _chatUserMap[adminId]!;
+    }
     final name = admin?.name ?? 'Coach';
     return _ChatUser(
       id: admin?.id ?? '',
@@ -210,9 +234,14 @@ class _ChatPageState extends State<ChatPage> {
         ..clear()
         ..addAll(query.docs.map((d) {
           final data = d.data();
+          final senderId = (data['senderId'] ?? '').toString();
+          final dbIsAdmin = data['isAdmin'] is bool ? data['isAdmin'] as bool : false;
+          final isAdmin = dbIsAdmin ||
+              (senderId != _currentUserId &&
+                  (user.role == AppUserRole.trainer || user.role == AppUserRole.admin));
           return _Message(
             text: (data['text'] ?? '').toString(),
-            isAdmin: data['senderId'] == _currentUserId,
+            isAdmin: isAdmin,
             createdAt: _msgDate(data['createdAt']),
           );
         }));
@@ -258,10 +287,42 @@ class _ChatPageState extends State<ChatPage> {
     return prefs.getInt(_lastReadKey(convId)) ?? 0;
   }
 
+  /// Lee desde Firestore el timestamp (ms epoch) de `lastReadBy.<uid>` si existe.
+  /// Devuelve 0 si no existe o si el usuario no está autenticado.
+  Future<int> _readRemoteLastReadMs(String convId) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return 0;
+      final doc = await _db.collection('chats').doc(convId).get();
+      final data = doc.data();
+      if (data == null) return 0;
+      final lastReadBy = data['lastReadBy'];
+      if (lastReadBy is Map) {
+        final v = lastReadBy[uid];
+        if (v is Timestamp) return v.toDate().millisecondsSinceEpoch;
+        if (v is num) return v.toInt();
+      }
+    } catch (e) {
+      debugPrint('chat: readRemoteLastRead error: $e');
+    }
+    return 0;
+  }
+
   Future<void> _markAsRead(String convId) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(
-        _lastReadKey(convId), DateTime.now().millisecondsSinceEpoch);
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    await prefs.setInt(_lastReadKey(convId), nowMs);
+    // Intento best-effort de escribir la marca remota con serverTimestamp.
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        await _db.collection('chats').doc(convId).set({
+          'lastReadBy': { uid: FieldValue.serverTimestamp() }
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('chat: failed to write remote lastRead: $e');
+    }
   }
 
   void _openChat(_ChatUser user) {
@@ -319,31 +380,70 @@ class _ChatPageState extends State<ChatPage> {
         .snapshots()
         .listen((snap) {
       if (!mounted) return;
-      if (_openedUser?.id == peerId) {
-        // Chat abierto → marcar como leído automáticamente
-        peer.unreadCount = 0;
-        unawaited(_markAsRead(convId));
-      } else {
-        // Sumar a los ya no leídos
-        setState(() => peer.unreadCount += snap.docChanges
+      try {
+        final addedChanges = snap.docChanges
             .where((c) => c.type == DocumentChangeType.added)
-            .length);
-      }
-      _syncNotifier();
+            .toList();
+        if (addedChanges.isEmpty) return;
+        final newMsgs = <_Message>[];
+        for (final c in addedChanges) {
+          final data = c.doc.data();
+          if (data == null) continue;
+          final senderId = (data['senderId'] ?? '').toString();
+          final dbIsAdmin = data['isAdmin'] is bool ? data['isAdmin'] as bool : false;
+          final isAdmin = dbIsAdmin ||
+              (senderId != _currentUserId &&
+                  (peer.role == AppUserRole.trainer || peer.role == AppUserRole.admin));
+          newMsgs.add(_Message(
+            text: (data['text'] ?? '').toString(),
+            isAdmin: isAdmin,
+            createdAt: _msgDate(data['createdAt']),
+          ));
+        }
+
+        if (_openedUser?.id == peerId) {
+          // Chat abierto → append y marcar como leído
+          setState(() {
+            peer.messages.addAll(newMsgs);
+            peer.unreadCount = 0;
+          });
+          unawaited(_markAsRead(convId));
+        } else {
+          // Sumar a los ya no leídos
+          setState(() => peer.unreadCount += newMsgs.length);
+        }
+        _syncNotifier();
+      } catch (_) {}
     });
   }
 
   Future<void> _loadInitialUnread(_ChatUser peer, String convId) async {
-    final lastReadTs = await _getLastReadTs(convId);
-    // Si lastReadTs==0 (primera vez) usamos 0 como filtro → cuenta TODOS los
-    // mensajes del peer como no leídos, que es el comportamiento correcto.
+    int localLastRead = 0;
+    try {
+      localLastRead = await _getLastReadTs(convId);
+    } catch (_) {}
+
+    int effectiveLastRead = localLastRead;
+    try {
+      final remoteLastRead = await _readRemoteLastReadMs(convId);
+      if (remoteLastRead > effectiveLastRead) {
+        effectiveLastRead = remoteLastRead;
+        // Actualizar el local para acelerar próximas cargas.
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(_lastReadKey(convId), effectiveLastRead);
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    // Si effectiveLastRead == 0 contará todos los mensajes.
     try {
       final snap = await _db
           .collection('chats')
           .doc(convId)
           .collection('messages')
           .where('senderId', isEqualTo: peer.id)
-          .where('createdAt', isGreaterThan: lastReadTs)
+          .where('createdAt', isGreaterThan: effectiveLastRead)
           .get();
       if (!mounted) return;
       final count = snap.docs.length;
@@ -386,6 +486,10 @@ class _ChatPageState extends State<ChatPage> {
         final convId = _conversationId(_currentUserId, _trainerChatUser.id);
         unawaited(_markAsRead(convId));
       }
+      // Si no hay trainer ni admin en memoria, intentar recuperar admin desde Firestore
+      if (_trainerChatUser.id.isEmpty) {
+        unawaited(_ensureAdminForOrphanUser());
+      }
     }
     // Arranca todos los listeners de mensajes en tiempo real
     _startAllListeners();
@@ -393,10 +497,63 @@ class _ChatPageState extends State<ChatPage> {
     UserStore.instance.addListener(_retryListenersIfNeeded);
   }
 
+  Future<void> _ensureAdminForOrphanUser() async {
+    try {
+      final me = UserStore.instance.currentUser;
+      final trainerId = (me.trainerId ?? '').trim();
+      if (trainerId.isNotEmpty) return;
+
+      // Preferir admin ya cargado en UserStore
+      final admins = UserStore.instance.users.where((u) => u.role == AppUserRole.admin).toList();
+      if (admins.isNotEmpty) {
+        final chatUser = _toChatUser(admins.first);
+        if (!mounted) return;
+        setState(() {
+          _chatUserMap[chatUser.id] = chatUser;
+        });
+        _listenConversation(chatUser);
+        unawaited(_loadConversation(chatUser));
+        final convId = _conversationId(_currentUserId, chatUser.id);
+        unawaited(_markAsRead(convId));
+        return;
+      }
+
+      // No hay admin en memoria: buscar en Firestore
+      final q = await _db
+          .collection('users')
+          .where('role', isEqualTo: appUserRoleToString(AppUserRole.admin))
+          .limit(1)
+          .get();
+      if (q.docs.isEmpty) return;
+      final d = q.docs.first;
+      final data = d.data();
+      final name = data['name'] is String ? data['name'] as String : 'Admin';
+      final chatUser = _ChatUser(
+        id: d.id,
+        name: name,
+        initial: name.isNotEmpty ? name[0].toUpperCase() : 'A',
+        messages: const [],
+        photoBytes: null,
+        photoUrl: data['photoUrl'] is String ? data['photoUrl'] as String : '',
+        role: AppUserRole.admin,
+        createdAt: null,
+      );
+      if (!mounted) return;
+      setState(() {
+        _chatUserMap[chatUser.id] = chatUser;
+      });
+      _listenConversation(chatUser);
+      unawaited(_loadConversation(chatUser));
+      final convId = _conversationId(_currentUserId, chatUser.id);
+      unawaited(_markAsRead(convId));
+    } catch (_) {}
+  }
+
   /// Cuando UserStore carga los datos (trainer, admin), arranca los listeners
   /// que no se pudieron iniciar porque el id del interlocutor era vacío.
   void _retryListenersIfNeeded() {
     if (!mounted) return;
+    // Caso usuario regular: reintentar cuando se cargue el trainerId
     if (_isRegularUser && _convSubs.isEmpty) {
       final rebuilt = _buildTrainerChatUser();
       if (rebuilt.id.isNotEmpty) {
@@ -404,6 +561,41 @@ class _ChatPageState extends State<ChatPage> {
         _chatUserMap[rebuilt.id] = rebuilt;
         _listenConversation(rebuilt);
         unawaited(_loadConversation(rebuilt));
+      }
+    }
+
+    // Caso trainer/admin: si al inicio no había usuarios cargados, reintentar
+    // cuando UserStore actualice la lista de usuarios.
+    if ((_isTrainer || _isAdmin) && _convSubs.isEmpty) {
+      final list = _buildChatList();
+      if (list.isNotEmpty) {
+        UserStore.instance.removeListener(_retryListenersIfNeeded);
+        for (final u in list) {
+          // Registrar en el mapa y arrancar listener si aún no existe
+          _chatUserMap[u.id] = u;
+          _listenConversation(u);
+          unawaited(_loadConversation(u));
+        }
+        // Asegurar que el chat con admin esté también escuchado para trainers
+        if (_isTrainer && _adminChatUser.id.isNotEmpty) {
+          _chatUserMap[_adminChatUser.id] = _adminChatUser;
+          _listenConversation(_adminChatUser);
+          unawaited(_loadConversation(_adminChatUser));
+        }
+      } else {
+        // Si aún no hay usuarios en UserStore, intentar forzar carga desde Firestore.
+        unawaited(UserStore.instance.loadAllUsersFromFirestore().then((_) {
+          if (!mounted) return;
+          final rebuiltList = _buildChatList();
+          if (rebuiltList.isNotEmpty) {
+            UserStore.instance.removeListener(_retryListenersIfNeeded);
+            for (final u in rebuiltList) {
+              _chatUserMap[u.id] = u;
+              _listenConversation(u);
+              unawaited(_loadConversation(u));
+            }
+          }
+        }));
       }
     }
   }
@@ -428,39 +620,44 @@ class _ChatPageState extends State<ChatPage> {
     return ListenableBuilder(
       listenable: UserStore.instance,
       builder: (context, _) {
-        // ── USUARIO / Sin clave: directo a chat con su entrenador ──
+        // ── USUARIO / Sin clave: mostrar vista similar a trainer.
+        // - `user`: mostrar la tarjeta de su entrenador (si vinculada).
+        // - `sinclave`: no mostrar tarjetas; solo FAB de contacto con admin.
         if (_isRegularUser) {
-          return _ConversationView(
-            key: const ValueKey('user-chat'),
-            user: _trainerChatUser,
-            titleOverride: _trainerChatUser.name,
-            showCoachNameInMessages: true,
-            coachNameForMessages: _trainerChatUser.name,
-            coachPhotoBytes: _trainerChatUser.photoBytes,
-            coachPhotoUrl: _trainerChatUser.photoUrl,
-            onMessageSent: (text) {
-              final peer = _trainerChatUser;
-              final now = DateTime.now();
-              setState(() {
-                peer.messages
-                    .add(_Message(text: text, isAdmin: false, createdAt: now));
-              });
-              unawaited(() async {
-                if (peer.id.isEmpty) return;
-                final convId = _conversationId(_currentUserId, peer.id);
-                final ref = _db.collection('chats').doc(convId);
-                await ref.set({
-                  'participants': [_currentUserId, peer.id],
-                  'updatedAt': now.millisecondsSinceEpoch,
-                }, SetOptions(merge: true));
-                await ref.collection('messages').add({
-                  'text': text,
-                  'isAdmin': false,
-                  'senderId': _currentUserId,
-                  'createdAt': now.millisecondsSinceEpoch,
-                });
-              }());
-            },
+          final list = _getChatListForDisplay();
+          return Stack(
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                child: _openedUser == null
+                    ? _UserListView(
+                        key: const ValueKey('user-list'),
+                        users: list,
+                        onUserTap: _openChat,
+                      )
+                    : _ConversationView(
+                        key: ValueKey(_openedUser!.id),
+                        user: _openedUser!,
+                        onBack: _closeChat,
+                        onMessageSent: (text) {
+                          final opened = _openedUser;
+                          if (opened == null) return;
+                          unawaited(_sendMessage(user: opened, text: text));
+                        },
+                      ),
+              ),
+              // Para usuarios sin clave mostrar FAB de contacto al admin
+              if (_openedUser == null && _role == AppUserRole.sinclave)
+                Positioned(
+                  right: 18,
+                  bottom: 18,
+                  child: _AdminContactButton(
+                    adminName: _adminChatUser.name,
+                    unreadCount: _adminChatUser.unreadCount,
+                    onTap: () => _openChat(_adminChatUser),
+                  ),
+                ),
+            ],
           );
         }
 
@@ -621,178 +818,10 @@ class _UserListViewState extends State<_UserListView> {
     super.dispose();
   }
 
-  String _filterLabel() {
-    return switch (_filter) {
-      _ChatAdminFilter.all => 'Todos',
-      _ChatAdminFilter.trainers => 'Entrenadores',
-      _ChatAdminFilter.myUsers => 'Mis usuarios',
-      _ChatAdminFilter.noCode => 'Sin clave',
-    };
-  }
+  // Filtro y diálogos se manejan inline; métodos auxiliares eliminados
 
-  Future<void> _showFilterModal() async {
-    final picked = await showDialog<_ChatAdminFilter>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        final isDark = theme.brightness == Brightness.dark;
-        final baseColor = isDark
-            ? Colors.black.withValues(alpha: 0.30)
-            : Colors.white.withValues(alpha: 0.20);
-        final borderColor = isDark
-            ? Colors.white.withValues(alpha: 0.10)
-            : Colors.white.withValues(alpha: 0.40);
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              decoration: BoxDecoration(
-                color: baseColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor, width: 0.8),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.filter_list, color: theme.colorScheme.primary, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Filtros de chat',
-                        style: TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildFilterOption(ctx, _ChatAdminFilter.all, 'Todos'),
-                  _buildFilterOption(ctx, _ChatAdminFilter.trainers, 'Entrenadores'),
-                  _buildFilterOption(ctx, _ChatAdminFilter.myUsers, 'Mis usuarios'),
-                  _buildFilterOption(ctx, _ChatAdminFilter.noCode, 'Sin clave'),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-    if (picked != null) setState(() => _filter = picked);
-  }
+  
 
-  Future<void> _showSingleFilterModal(_ChatAdminFilter option, String label) async {
-    final applied = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        final isDark = theme.brightness == Brightness.dark;
-        final baseColor = isDark
-            ? Colors.black.withValues(alpha: 0.30)
-            : Colors.white.withValues(alpha: 0.20);
-        final borderColor = isDark
-            ? Colors.white.withValues(alpha: 0.10)
-            : Colors.white.withValues(alpha: 0.40);
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              decoration: BoxDecoration(
-                color: baseColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor, width: 0.8),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.filter_list, color: theme.colorScheme.primary, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        label,
-                        style: TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Aplicar filtro "${label}" para la lista de chats.',
-                    style: TextStyle(color: theme.colorScheme.onSurface),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.of(ctx).pop(true),
-                          child: const Text('Aplicar'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(false),
-                        child: const Text('Cancelar'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-    if (applied == true) setState(() => _filter = option);
-  }
-
-  Widget _buildFilterOption(BuildContext ctx, _ChatAdminFilter option, String label) {
-    final selected = option == _filter;
-    final theme = Theme.of(ctx);
-    return GestureDetector(
-      onTap: () => Navigator.of(ctx).pop(option),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: selected ? Colors.black : theme.colorScheme.onSurface,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-            ),
-            if (selected)
-              Icon(Icons.check_circle, color: theme.colorScheme.primary, size: 18)
-            else
-              Icon(Icons.circle_outlined, color: theme.colorScheme.onSurface.withValues(alpha: 0.28), size: 18),
-          ],
-        ),
-      ),
-    );
-  }
 
   List<_ChatUser> _filteredUsers() {
     var list = widget.users.toList();
@@ -1049,7 +1078,6 @@ class _UserEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final lastMsg = user.messages.isNotEmpty ? user.messages.last : null;
     final isLight = theme.brightness == Brightness.light;
     final bool isSinClave = user.role == AppUserRole.sinclave ||
       (user.role == AppUserRole.user &&
@@ -1154,9 +1182,9 @@ class _UserEntry extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withOpacity(0.12),
+                              color: theme.colorScheme.primary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.18)),
+                              border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.18)),
                             ),
                             child: Text(
                               'Sin clave',
@@ -1221,12 +1249,25 @@ class _ConversationViewState extends State<_ConversationView> {
   final TextEditingController _inputCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final FocusNode _inputFocus = FocusNode();
+  int _lastMessagesCount = 0;
 
   @override
   void initState() {
     super.initState();
     _inputCtrl.addListener(() => setState(() {}));
     _inputFocus.addListener(() => setState(() {}));
+    _lastMessagesCount = widget.user.messages.length;
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConversationView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final prev = _lastMessagesCount;
+    final now = widget.user.messages.length;
+    if (now > prev) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    }
+    _lastMessagesCount = now;
   }
 
   @override
@@ -1494,7 +1535,7 @@ class _MessageBubble extends StatelessWidget {
                     fit: BoxFit.cover,
                     width: 20,
                     height: 20,
-                    errorBuilder: (_, __, ___) => Text(
+                    errorBuilder: (_, _, _) => Text(
                       initial,
                       style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.w700),
                     ),

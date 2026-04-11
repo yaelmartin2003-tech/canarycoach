@@ -50,8 +50,37 @@ class QuestionnaireQuestion {
 }
 
 const List<QuestionnaireQuestion> kDefaultQuestionnaireQuestions = [
-  QuestionnaireQuestion(id: 'q1', text: '¿Tienes alguna lesión?'),
-  QuestionnaireQuestion(id: 'q2', text: '¿Cuántos días entrenas por semana?'),
+  QuestionnaireQuestion(
+    id: 'q1',
+    text:
+        '¿Tienes alguna lesión, dolor o condición médica que se deba tener en cuenta?',
+  ),
+  QuestionnaireQuestion(
+    id: 'q2',
+    text: '¿Cuántos días entrenarías por semana?',
+  ),
+  QuestionnaireQuestion(
+    id: 'q3',
+    text: '¿Cuánto tiempo podrías dedicar por sesión de entrenamiento?',
+  ),
+  QuestionnaireQuestion(
+    id: 'q4',
+    text:
+        '¿Tienes preferencias por algunos ejercicios que te gustaría que incluyera en las rutinas?',
+  ),
+  QuestionnaireQuestion(
+    id: 'q5',
+    text: '¿Algún ejercicio que prefieras evitar?',
+  ),
+  QuestionnaireQuestion(
+    id: 'q6',
+    text:
+        '¿Entrenarías en casa o en gimnasio? Si es solo en casa, ¿qué material tienes disponible para entrenar?',
+  ),
+  QuestionnaireQuestion(
+    id: 'q7',
+    text: 'Cualquier información extra, déjamela por aquí.',
+  ),
 ];
 
 class QuestionnaireResponse {
@@ -356,8 +385,11 @@ class UserStore extends ChangeNotifier {
 
   static final UserStore instance = UserStore._internal();
 
-  List<QuestionnaireQuestion> _questionnaireTemplate =
+    List<QuestionnaireQuestion> _questionnaireTemplate =
       List<QuestionnaireQuestion>.from(kDefaultQuestionnaireQuestions);
+
+    // Plantillas de cuestionario por entrenador (trainerId -> preguntas)
+    final Map<String, List<QuestionnaireQuestion>> _trainerQuestionnaireTemplates = {};
 
   String _currentUserId = '';
 
@@ -634,6 +666,33 @@ class UserStore extends ChangeNotifier {
             : const <String>[];
         final profilePhotoUrl = data['photoUrl'] is String ? data['photoUrl'] as String : '';
 
+        // Si el documento corresponde a un entrenador y tiene una plantilla
+        // de cuestionario, cargarla en memoria para aplicarla a sus usuarios.
+        if (role == AppUserRole.trainer) {
+          // Compatibilidad: aceptar tanto 'trainerQuestionnaireTemplate'
+          // (clave usada históricamente) como 'questionnaireTemplate'.
+          final rawTpl = data['trainerQuestionnaireTemplate'] ?? data['questionnaireTemplate'];
+          if (rawTpl is List) {
+            try {
+              final parsed = <QuestionnaireQuestion>[];
+              for (final e in rawTpl) {
+                if (e is Map) {
+                  final id = e['id']?.toString() ?? 'q${parsed.length + 1}';
+                  final text = e['text']?.toString() ?? '';
+                  if (text.trim().isNotEmpty) parsed.add(QuestionnaireQuestion(id: id, text: text));
+                } else if (e is String) {
+                  final id = 'q${parsed.length + 1}';
+                  final text = e;
+                  if (text.trim().isNotEmpty) parsed.add(QuestionnaireQuestion(id: id, text: text));
+                }
+              }
+              if (parsed.isNotEmpty) {
+                _trainerQuestionnaireTemplates[d.id] = parsed;
+              }
+            } catch (_) {}
+          }
+        }
+
         final AppUserData user;
         if (existing != null) {
           // Fusionar: actualizar solo datos de perfil, preservar datos ricos.
@@ -715,6 +774,25 @@ class UserStore extends ChangeNotifier {
           _users.insert(0, meUser);
         }
       }
+      // Aplicar plantillas por entrenador o plantilla base a usuarios que no
+      // tengan preguntas explícitas en su perfil cargado.
+      for (var i = 0; i < _users.length; i++) {
+        final u = _users[i];
+        if (u.questionnaireQuestions.isNotEmpty) continue;
+        final trainerId = u.trainerId;
+        if (trainerId != null && trainerId.isNotEmpty) {
+          final trainerTpl = _trainerQuestionnaireTemplates[trainerId];
+          if (trainerTpl != null && trainerTpl.isNotEmpty) {
+            _users[i] = u.copyWith(questionnaireQuestions: trainerTpl);
+            continue;
+          }
+        }
+        if (_questionnaireTemplate.isNotEmpty) {
+          _users[i] = u.copyWith(questionnaireQuestions: List<QuestionnaireQuestion>.from(_questionnaireTemplate));
+        } else {
+          _users[i] = u.copyWith(questionnaireQuestions: List<QuestionnaireQuestion>.from(kDefaultQuestionnaireQuestions));
+        }
+      }
       notifyListeners();
     } catch (_) {}
   }
@@ -776,6 +854,14 @@ class UserStore extends ChangeNotifier {
   List<QuestionnaireQuestion> currentUserQuestionnaireQuestions() {
     final items = currentUser.questionnaireQuestions;
     if (items.isNotEmpty) return List.unmodifiable(items);
+    final trainerId = currentUser.trainerId;
+    if (trainerId != null && trainerId.isNotEmpty) {
+      final trainerTemplate = _trainerQuestionnaireTemplates[trainerId];
+      if (trainerTemplate != null && trainerTemplate.isNotEmpty) {
+        return List.unmodifiable(trainerTemplate);
+      }
+    }
+    if (_questionnaireTemplate.isNotEmpty) return List.unmodifiable(_questionnaireTemplate);
     return List.unmodifiable(kDefaultQuestionnaireQuestions);
   }
 
@@ -788,10 +874,20 @@ class UserStore extends ChangeNotifier {
 
   List<QuestionnaireQuestion> questionnaireQuestionsForUser(int index) {
     if (index < 0 || index >= _users.length) {
+      if (_questionnaireTemplate.isNotEmpty) return List.unmodifiable(_questionnaireTemplate);
       return List.unmodifiable(kDefaultQuestionnaireQuestions);
     }
-    final items = _users[index].questionnaireQuestions;
+    final user = _users[index];
+    final items = user.questionnaireQuestions;
     if (items.isNotEmpty) return List.unmodifiable(items);
+    final trainerId = user.trainerId;
+    if (trainerId != null && trainerId.isNotEmpty) {
+      final trainerTemplate = _trainerQuestionnaireTemplates[trainerId];
+      if (trainerTemplate != null && trainerTemplate.isNotEmpty) {
+        return List.unmodifiable(trainerTemplate);
+      }
+    }
+    if (_questionnaireTemplate.isNotEmpty) return List.unmodifiable(_questionnaireTemplate);
     return List.unmodifiable(kDefaultQuestionnaireQuestions);
   }
 
@@ -865,6 +961,11 @@ class UserStore extends ChangeNotifier {
     final allowedIds = effective.map((q) => q.id).toSet();
     for (var i = 0; i < _users.length; i++) {
       final user = _users[i];
+      // No sobrescribir a usuarios cuyo entrenador tiene plantilla propia.
+      final trainerId = user.trainerId;
+      if (trainerId != null && trainerId.isNotEmpty && _trainerQuestionnaireTemplates.containsKey(trainerId)) {
+        continue;
+      }
       final kept = user.questionnaireResponses
           .where((r) => allowedIds.contains(r.questionId))
           .toList();
@@ -872,6 +973,49 @@ class UserStore extends ChangeNotifier {
         questionnaireQuestions: effective,
         questionnaireResponses: kept,
       );
+    }
+    notifyListeners();
+  }
+
+  Future<void> saveQuestionnaireTemplateForTrainer(
+    String trainerId,
+    List<QuestionnaireQuestion> questions,
+  ) async {
+    final sanitizedQuestions = questions
+        .where((q) => q.text.trim().isNotEmpty)
+        .map((q) => q.copyWith(text: q.text.trim()))
+        .toList();
+    final effective = sanitizedQuestions.isEmpty
+        ? List<QuestionnaireQuestion>.from(kDefaultQuestionnaireQuestions)
+        : sanitizedQuestions;
+
+    // Guardar en memoria
+    _trainerQuestionnaireTemplates[trainerId] = effective;
+
+    // Persistir en Firestore en el documento del entrenador
+    try {
+      final serialized = effective.map((q) => {'id': q.id, 'text': q.text}).toList();
+      // Persistir en ambos campos para compatibilidad con versiones anteriores
+      final docRef = FirebaseFirestore.instance.collection('users').doc(trainerId);
+      await docRef.set({
+        'questionnaireTemplate': serialized,
+        'trainerQuestionnaireTemplate': serialized,
+      }, SetOptions(merge: true));
+    } catch (_) {}
+
+    // Aplicar la plantilla a sus usuarios en memoria (sin tocar otros entrenadores)
+    final allowedIds = effective.map((q) => q.id).toSet();
+    for (var i = 0; i < _users.length; i++) {
+      final user = _users[i];
+      if (user.trainerId == trainerId) {
+        final kept = user.questionnaireResponses
+            .where((r) => allowedIds.contains(r.questionId))
+            .toList();
+        _users[i] = user.copyWith(
+          questionnaireQuestions: effective,
+          questionnaireResponses: kept,
+        );
+      }
     }
     notifyListeners();
   }
@@ -1139,6 +1283,9 @@ class UserStore extends ChangeNotifier {
     if (index == -1) return;
     _users[index] = _users[index].copyWith(photoBytes: photoBytes);
     unawaited(_persistUserToFirestore(_users[index]));
+    // Guardar también los datos ricos inmediatamente para propagar la foto
+    // a través de user_rich_data/{uid} (best-effort).
+    unawaited(CloudSyncService.instance.saveNow());
     notifyListeners();
   }
 
@@ -1150,6 +1297,8 @@ class UserStore extends ChangeNotifier {
       photoBytes: null,
     );
     unawaited(_persistUserToFirestore(_users[index]));
+    // Guardar los datos ricos para que la URL se sincronice en tiempo real.
+    unawaited(CloudSyncService.instance.saveNow());
     notifyListeners();
   }
 
