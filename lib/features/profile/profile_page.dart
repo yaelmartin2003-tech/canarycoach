@@ -1090,7 +1090,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                OutlinedButton(
+                ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -1098,14 +1098,15 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     );
                   },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: onSurface,
-                    side: BorderSide(color: AppTheme.surfaceBorderFor(context)),
-                    minimumSize: const Size(0, 38),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size(160, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
                     ),
+                    elevation: 0,
                   ),
                   child: const Text('Editar perfil'),
                 ),
@@ -1259,46 +1260,89 @@ class _ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = 110.0;
     final color = Theme.of(context).colorScheme.primary.withValues(alpha: 0.78);
-    return Container(
-      width: 92,
-      height: 92,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      child: Center(
-        child: fotoBytes != null
-            ? ClipOval(
-                child: Image.memory(
-                  fotoBytes!,
-                  width: 92,
-                  height: 92,
-                  fit: BoxFit.cover,
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ProfileEditPage()),
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
                 ),
-              )
-            : fotoUrl.trim().isNotEmpty
-            ? ClipOval(
-                child: Image.network(
-                  fotoUrl,
-                  width: 92,
-                  height: 92,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Text(
-                    fotoInicial,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 32,
-                    ),
-                  ),
-                ),
-              )
-            : Text(
-                fotoInicial,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 32,
-                ),
+              ],
+              border: Border.all(
+                color: Theme.of(context).cardColor.withValues(alpha: 0.12),
+                width: 1.5,
               ),
+            ),
+            child: Center(
+              child: fotoBytes != null
+                  ? ClipOval(
+                      child: Image.memory(
+                        fotoBytes!,
+                        width: size,
+                        height: size,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : fotoUrl.trim().isNotEmpty
+                      ? ClipOval(
+                          child: Image.network(
+                            fotoUrl,
+                            width: size,
+                            height: size,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Text(
+                              fotoInicial,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 40,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Text(
+                          fotoInicial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 40,
+                          ),
+                        ),
+            ),
+          ),
+          Positioned(
+            right: -6,
+            bottom: -6,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: Icon(Icons.edit_rounded,
+                  size: 18, color: Theme.of(context).colorScheme.primary),
+            ),
+          ),
+        ],
       ),
     );
   }
